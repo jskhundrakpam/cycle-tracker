@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,7 +49,8 @@ data class AppData(
     val periods: List<PeriodEntry> = emptyList(), 
     val logs: List<DailyLog> = emptyList(),
     val defaultCycleLength: Int = 28, 
-    val defaultPeriodLength: Int = 5
+    val defaultPeriodLength: Int = 5,
+    val isDarkMode: Boolean = false
 )
 
 class Store(context: Context) {
@@ -80,7 +83,8 @@ class Store(context: Context) {
             AppData(
                 periods, logs,
                 root.optInt("defaultCycleLength", 28), 
-                root.optInt("defaultPeriodLength", 5)
+                root.optInt("defaultPeriodLength", 5),
+                root.optBoolean("isDarkMode", false)
             )
         } catch (e: Exception) { AppData() }
     }
@@ -101,6 +105,7 @@ class Store(context: Context) {
             .put("logs", lArr)
             .put("defaultCycleLength", d.defaultCycleLength)
             .put("defaultPeriodLength", d.defaultPeriodLength)
+            .put("isDarkMode", d.isDarkMode)
 
         runCatching { file.writeText(root.toString()) }
         _data.value = d
@@ -134,7 +139,19 @@ class Store(context: Context) {
     }
 
     fun setDefaults(cycle: Int, period: Int) = save(_data.value.copy(defaultCycleLength = cycle, defaultPeriodLength = period))
-    fun clearAll() = save(AppData(defaultCycleLength = _data.value.defaultCycleLength, defaultPeriodLength = _data.value.defaultPeriodLength))
+    fun toggleTheme() = save(_data.value.copy(isDarkMode = !_data.value.isDarkMode))
+    fun clearAll() = save(AppData(defaultCycleLength = _data.value.defaultCycleLength, defaultPeriodLength = _data.value.defaultPeriodLength, isDarkMode = _data.value.isDarkMode))
+    
+    fun exportData(): String {
+        val d = _data.value
+        val sb = StringBuilder()
+        sb.append("--- Cycle Tracker Export ---\n\n")
+        sb.append("Periods Logged:\n")
+        d.periods.forEach { sb.append("Start: ${it.start}, End: ${it.end ?: "Ongoing"}\n") }
+        sb.append("\nDaily Logs:\n")
+        d.logs.forEach { sb.append("Date: ${it.date} | Flow: ${it.flow} | Mood: ${it.mood} | Symptoms: ${it.symptoms.joinToString(", ")} | Note: ${it.note}\n") }
+        return sb.toString()
+    }
 }
 
 enum class Phase { MENSTRUAL, FOLLICULAR, OVULATION, LUTEAL }
@@ -197,20 +214,38 @@ val Charcoal = Color(0xFF2C2C2C)
 val SoftGrey = Color(0xFFF5F5F5)
 val GreenLight = Color(0xFFE8F5E9)
 
+val DarkBackground = Color(0xFF121212)
+val DarkSurface = Color(0xFF1E1E1E)
+val DarkSurfaceVariant = Color(0xFF2C2C2C)
+val DarkTextPrimary = Color(0xFFE0E0E0)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = Store(applicationContext)
         setContent {
-            MaterialTheme(
-                colorScheme = lightColorScheme(
+            val data by store.data
+            val isDark = data.isDarkMode
+            
+            val colorScheme = if (isDark) {
+                darkColorScheme(
+                    primary = RosePrimary,
+                    onPrimary = Color.White,
+                    background = DarkBackground,
+                    surface = DarkSurface,
+                    onSurface = DarkTextPrimary
+                )
+            } else {
+                lightColorScheme(
                     primary = RosePrimary,
                     onPrimary = Color.White,
                     background = Color(0xFFFDFBFB),
                     surface = Color.White,
                     onSurface = Charcoal
                 )
-            ) {
+            }
+
+            MaterialTheme(colorScheme = colorScheme) {
                 AppRoot(store)
             }
         }
@@ -227,7 +262,7 @@ fun AppRoot(store: Store) {
     Scaffold(
         bottomBar = {
             if (onboarded) {
-                NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
                     NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("◉", fontSize = 20.sp) }, label = { Text("Home") })
                     NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("▤", fontSize = 20.sp) }, label = { Text("Calendar") })
                     NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Text("⚙", fontSize = 20.sp) }, label = { Text("Settings") })
@@ -297,7 +332,7 @@ fun HomeScreen(data: AppData, store: Store) {
                     progress = { day.toFloat() / stats.first.toFloat() },
                     modifier = Modifier.size(200.dp),
                     color = RosePrimary,
-                    trackColor = RoseLight,
+                    trackColor = if (data.isDarkMode) DarkSurfaceVariant else RoseLight,
                     strokeWidth = 16.dp
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -309,7 +344,12 @@ fun HomeScreen(data: AppData, store: Store) {
             Spacer(Modifier.height(16.dp))
             
             // Insights Card
-            Card(colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+                elevation = CardDefaults.cardElevation(2.dp), 
+                shape = RoundedCornerShape(16.dp), 
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Avg Cycle", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
@@ -326,11 +366,33 @@ fun HomeScreen(data: AppData, store: Store) {
                 }
             }
 
+            // History Chart
+            if (data.periods.size >= 2) {
+                Spacer(Modifier.height(16.dp))
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text("Recent Cycle Lengths", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(16.dp))
+                        val sortedPeriods = data.periods.sortedBy { it.start }
+                        val intervals = sortedPeriods.zipWithNext { a, b -> ChronoUnit.DAYS.between(a.start, b.start).toInt() }.takeLast(6)
+                        Row(Modifier.fillMaxWidth().height(100.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                            intervals.forEach { len ->
+                                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(Modifier.width(20.dp).height((len * 2).dp).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(RosePrimary))
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("$len", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (todayLog.flow.isNotEmpty() || todayLog.mood.isNotEmpty() || todayLog.symptoms.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Card(colors = CardDefaults.cardColors(containerColor = SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(colors = CardDefaults.cardColors(containerColor = if (data.isDarkMode) DarkSurfaceVariant else SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Today's Log", fontWeight = FontWeight.Bold, color = Charcoal)
+                        Text("Today's Log", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         if (todayLog.flow.isNotEmpty()) Text("Flow: ${todayLog.flow}", fontSize = 14.sp)
                         if (todayLog.mood.isNotEmpty()) Text("Mood: ${todayLog.mood}", fontSize = 14.sp)
@@ -393,11 +455,11 @@ fun CalendarScreen(data: AppData, store: Store) {
                             
                             val bgColor = when (mark) {
                                 "logged" -> RosePrimary
-                                "predicted" -> RoseLight
-                                "fertile" -> GreenLight
+                                "predicted" -> if (data.isDarkMode) Color(0xFF4A2530) else RoseLight
+                                "fertile" -> if (data.isDarkMode) Color(0xFF1B3824) else GreenLight
                                 else -> Color.Transparent
                             }
-                            val textColor = if (mark == "logged") Color.White else Charcoal
+                            val textColor = if (mark == "logged") Color.White else MaterialTheme.colorScheme.onSurface
                             
                             Box(
                                 Modifier.fillMaxSize().clip(CircleShape).background(bgColor)
@@ -416,11 +478,11 @@ fun CalendarScreen(data: AppData, store: Store) {
             }
         }
         Spacer(Modifier.height(32.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 LegendItem(RosePrimary, "Period")
-                LegendItem(RoseLight, "Predicted")
-                LegendItem(GreenLight, "Fertile")
+                LegendItem(if (data.isDarkMode) Color(0xFF4A2530) else RoseLight, "Predicted")
+                LegendItem(if (data.isDarkMode) Color(0xFF1B3824) else GreenLight, "Fertile")
             }
         }
     }
@@ -457,7 +519,7 @@ fun LogDayBottomSheet(
     val moodOptions = listOf("Happy", "Calm", "Anxious", "Irritable", "Sad")
     val symptomOptions = listOf("Cramps", "Headache", "Bloating", "Acne", "Backache", "Fatigue")
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.White) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
             Text(date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
@@ -496,17 +558,11 @@ fun LogDayBottomSheet(
             )
             
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = { onSave(DailyLog(date, flow, mood, symptoms.toList(), note)) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Save Log") }
+            Button(onClick = { onSave(DailyLog(date, flow, mood, symptoms.toList(), note)) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Save Log") }
             
             if (isPeriodStart) {
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDeletePeriod, modifier = Modifier.fillMaxWidth()) {
-                    Text("Remove Period Start for this Day", color = Color.Red)
-                }
+                TextButton(onClick = onDeletePeriod, modifier = Modifier.fillMaxWidth()) { Text("Remove Period Start for this Day", color = Color.Red) }
             }
             Spacer(Modifier.height(32.dp))
         }
@@ -522,13 +578,29 @@ fun LegendItem(color: Color, text: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(data: AppData, store: Store) {
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+    val clipboardManager = LocalClipboardManager.current
+    var showCopiedText by remember { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
         
-        Card(colors = CardDefaults.cardColors(containerColor = SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("Dark Mode", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Easier on the eyes at night", color = Color.Gray, fontSize = 14.sp)
+                }
+                Switch(checked = data.isDarkMode, onCheckedChange = { store.toggleTheme() })
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 Text("Your Data", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.height(8.dp))
@@ -537,10 +609,25 @@ fun SettingsScreen(data: AppData, store: Store) {
             }
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
+        
+        Button(
+            onClick = { 
+                clipboardManager.setText(AnnotatedString(store.exportData()))
+                showCopiedText = true
+            }, 
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+        ) { 
+            Text(if (showCopiedText) "Copied to Clipboard!" else "Copy Data to Clipboard", fontWeight = FontWeight.Bold, fontSize = 16.sp) 
+        }
+
+        Spacer(Modifier.height(12.dp))
+
         Button(
             onClick = { store.clearAll() }, 
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE), contentColor = Color.Red), 
+            colors = ButtonDefaults.buttonColors(containerColor = if (data.isDarkMode) Color(0xFF3E1E1E) else Color(0xFFFFEBEE), contentColor = Color.Red), 
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp)
         ) { 

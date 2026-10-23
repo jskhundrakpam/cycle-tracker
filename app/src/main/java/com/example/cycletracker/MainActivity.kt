@@ -309,7 +309,11 @@ fun AppRoot(store: Store) {
                     shadowElevation = 12.dp,
                     modifier = Modifier.wrapContentSize()
                 ) {
-                    Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp), 
+                        horizontalArrangement = Arrangement.spacedBy(12.dp), 
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         FloatingNavItem("Home", Icons.Default.Home, tab == 0) { tab = 0 }
                         FloatingNavItem("Calendar", Icons.Default.DateRange, tab == 1) { tab = 1 }
                         FloatingNavItem("Settings", Icons.Default.Settings, tab == 2) { tab = 2 }
@@ -399,33 +403,23 @@ fun FloatingNavItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
     val bgColor = if (isSelected) RoseLight.copy(alpha = if (MaterialTheme.colorScheme.background == DarkBackground) 0.2f else 1f) else Color.Transparent
     val contentColor = if (isSelected) RosePrimary else Color.Gray
 
-    if (isSelected) {
-        // Selected: Horizontal pill
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50.dp))
-                .background(bgColor)
-                .clickable { onClick() }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        }
-    } else {
-        // Unselected: Vertical icon and text
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50.dp))
-                .clickable { onClick() }
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(4.dp))
-            Text(label, color = contentColor, fontWeight = FontWeight.Medium, fontSize = 11.sp)
-        }
+    // Always use a Column (Icon on top, Text on bottom)
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(bgColor)
+            .clickable { onClick() }
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label, 
+            color = contentColor, 
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+            fontSize = 12.sp
+        )
     }
 }
 

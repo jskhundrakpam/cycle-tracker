@@ -365,6 +365,38 @@ fun AppRoot(store: Store) {
 }
 
 @Composable
+fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
+    var start by remember { mutableStateOf(LocalDate.now()) }
+    var cycle by remember { mutableStateOf(28f) }
+    var period by remember { mutableStateOf(5f) }
+
+    Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center) {
+        Text("Welcome", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = RosePrimary)
+        Text("Let's personalize your tracker.", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
+        Spacer(Modifier.height(40.dp))
+
+        Text("Last period started", fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { start = start.minusDays(1) }, shape = CircleShape) { Text("−", fontSize = 20.sp) }
+            Text(start.format(DateTimeFormatter.ofPattern("d MMM yyyy")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            OutlinedButton(onClick = { if (!start.plusDays(1).isAfter(LocalDate.now())) start = start.plusDays(1) }, shape = CircleShape) { Text("+", fontSize = 20.sp) }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        Text("Cycle length: ${cycle.toInt()} days", fontWeight = FontWeight.SemiBold)
+        Slider(value = cycle, onValueChange = { cycle = it }, valueRange = 21f..40f, steps = 18, colors = SliderDefaults.colors(thumbColor = RosePrimary, activeTrackColor = RosePrimary))
+        Spacer(Modifier.height(16.dp))
+        Text("Period length: ${period.toInt()} days", fontWeight = FontWeight.SemiBold)
+        Slider(value = period, onValueChange = { period = it }, valueRange = 2f..10f, steps = 7, colors = SliderDefaults.colors(thumbColor = RosePrimary, activeTrackColor = RosePrimary))
+
+        Spacer(Modifier.height(40.dp))
+        Button(onClick = { onDone(start, cycle.toInt(), period.toInt()) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(50.dp)) {
+            Text("Start Tracking", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
 fun FloatingNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     val bgColor = if (isSelected) RoseLight.copy(alpha = if (MaterialTheme.colorScheme.background == DarkBackground) 0.2f else 1f) else Color.Transparent
     val contentColor = if (isSelected) RosePrimary else Color.Gray
@@ -753,7 +785,6 @@ fun SettingsScreen(data: AppData, store: Store) {
         Text("Settings", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = RosePrimary)
         Spacer(Modifier.height(24.dp))
 
-        // Defaults Sliders
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(32.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(24.dp)) {
                 Text("Default Cycle", fontWeight = FontWeight.Bold, fontSize = 18.sp)

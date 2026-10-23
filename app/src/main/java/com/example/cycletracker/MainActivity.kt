@@ -17,11 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -238,7 +236,6 @@ val Charcoal = Color(0xFF2C2C2C)
 val SoftGrey = Color(0xFFF5F5F5)
 val GreenLight = Color(0xFFE8F5E9)
 val CleanWhite = Color(0xFFFAFAFA)
-val SearchGrey = Color(0xFFF0F0F0)
 
 val DarkBackground = Color(0xFF121212)
 val DarkSurface = Color(0xFF1E1E1E)
@@ -312,7 +309,7 @@ fun AppRoot(store: Store) {
                     shadowElevation = 12.dp,
                     modifier = Modifier.wrapContentSize()
                 ) {
-                    Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                         FloatingNavItem("Home", Icons.Default.Home, tab == 0) { tab = 0 }
                         FloatingNavItem("Calendar", Icons.Default.DateRange, tab == 1) { tab = 1 }
                         FloatingNavItem("Settings", Icons.Default.Settings, tab == 2) { tab = 2 }
@@ -402,18 +399,32 @@ fun FloatingNavItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
     val bgColor = if (isSelected) RoseLight.copy(alpha = if (MaterialTheme.colorScheme.background == DarkBackground) 0.2f else 1f) else Color.Transparent
     val contentColor = if (isSelected) RosePrimary else Color.Gray
 
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(bgColor)
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(24.dp))
-        if (isSelected) {
-            Spacer(Modifier.width(8.dp))
+    if (isSelected) {
+        // Selected: Horizontal pill
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50.dp))
+                .background(bgColor)
+                .clickable { onClick() }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(6.dp))
             Text(label, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+    } else {
+        // Unselected: Vertical icon and text
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50.dp))
+                .clickable { onClick() }
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(label, color = contentColor, fontWeight = FontWeight.Medium, fontSize = 11.sp)
         }
     }
 }
@@ -425,7 +436,6 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
     val stats = Predictor.stats(data)
 
     var activeTab by remember { mutableStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -446,33 +456,9 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search flow, mood, notes...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray) },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color.Gray)
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(50.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = if (data.isDarkMode) DarkSurfaceVariant else SearchGrey,
-                focusedContainerColor = if (data.isDarkMode) DarkSurfaceVariant else SearchGrey,
-                unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = RosePrimary
-            )
-        )
-
         Spacer(Modifier.height(24.dp))
 
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50.dp)).background(if (data.isDarkMode) DarkSurfaceVariant else SearchGrey).padding(4.dp)) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50.dp)).background(if (data.isDarkMode) DarkSurfaceVariant else SoftGrey).padding(4.dp)) {
             Box(
                 Modifier.weight(1f).clip(RoundedCornerShape(50.dp))
                     .background(if (activeTab == 0) (if (data.isDarkMode) DarkSurface else Color.White) else Color.Transparent)
@@ -576,16 +562,10 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
             }
 
             Spacer(Modifier.height(24.dp))
-            Text(if (searchQuery.isBlank()) "Recent Activity" else "Search Results", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Recent Activity", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
-            val filteredLogs = data.logs.filter {
-                searchQuery.isBlank() ||
-                it.note.contains(searchQuery, true) ||
-                it.flow.contains(searchQuery, true) ||
-                it.mood.contains(searchQuery, true) ||
-                it.symptoms.any { s -> s.contains(searchQuery, true) }
-            }.sortedByDescending { it.date }.take(10)
+            val filteredLogs = data.logs.sortedByDescending { it.date }.take(5)
 
             if (filteredLogs.isNotEmpty()) {
                 filteredLogs.forEach { log ->
@@ -608,7 +588,7 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
                     }
                 }
             } else {
-                Text(if (searchQuery.isBlank()) "No recent logs. Tap the + button to start." else "No logs found matching '$searchQuery'", color = Color.Gray)
+                Text("No recent logs. Tap the + button to start.", color = Color.Gray)
             }
         }
 

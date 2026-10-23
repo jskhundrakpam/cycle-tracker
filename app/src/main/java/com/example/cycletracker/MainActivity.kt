@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -34,7 +36,19 @@ import kotlin.math.sqrt
 
 // --- DATA & LOGIC ---
 data class PeriodEntry(val start: LocalDate, val end: LocalDate? = null)
-data class AppData(val periods: List<PeriodEntry> = emptyList(), val defaultCycleLength: Int = 28, val defaultPeriodLength: Int = 5)
+data class DailyLog(
+    val date: LocalDate,
+    val flow: String = "",
+    val mood: String = "",
+    val symptoms: List<String> = emptyList(),
+    val note: String = ""
+)
+data class AppData(
+    val periods: List<PeriodEntry> = emptyList(), 
+    val logs: List<DailyLog> = emptyList(),
+    val defaultCycleLength: Int = 28, 
+    val defaultPeriodLength: Int = 5
+)
 
 class Store(context: Context) {
     private val file = File(context.filesDir, "data.json")
@@ -45,22 +59,60 @@ class Store(context: Context) {
         if (!file.exists()) return AppData()
         return try {
             val root = JSONObject(file.readText())
-            val arr = root.optJSONArray("periods") ?: JSONArray()
-            val periods = (0 until arr.length()).mapNotNull { i ->
-                val o = arr.getJSONObject(i)
+            
+            val pArr = root.optJSONArray("periods") ?: JSONArray()
+            val periods = (0 until pArr.length()).mapNotNull { i ->
+                val o = pArr.getJSONObject(i)
                 val start = runCatching { LocalDate.parse(o.getString("start")) }.getOrNull()
                 val end = o.optString("end", "").takeIf { it.isNotEmpty() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                 start?.let { PeriodEntry(it, end) }
             }
-            AppData(periods, root.optInt("defaultCycleLength", 28), root.optInt("defaultPeriodLength", 5))
+
+            val lArr = root.optJSONArray("logs") ?: JSONArray()
+            val logs = (0 until lArr.length()).mapNotNull { i ->
+                val o = lArr.getJSONObject(i)
+                val date = runCatching { LocalDate.parse(o.getString("date")) }.getOrNull()
+                val symptomsArr = o.optJSONArray("symptoms") ?: JSONArray()
+                val symptoms = (0 until symptomsArr.length()).map { symptomsArr.getString(it) }
+                date?.let { DailyLog(it, o.optString("flow"), o.optString("mood"), symptoms, o.optString("note")) }
+            }
+
+            AppData(
+                periods, logs,
+                root.optInt("defaultCycleLength", 28), 
+                root.optInt("defaultPeriodLength", 5)
+            )
         } catch (e: Exception) { AppData() }
     }
 
     private fun save(d: AppData) {
-        val arr = JSONArray()
-        d.periods.forEach { arr.put(JSONObject().put("start", it.start.toString()).put("end", it.end?.toString() ?: "")) }
-        runCatching { file.writeText(JSONObject().put("periods", arr).put("defaultCycleLength", d.defaultCycleLength).put("defaultPeriodLength", d.defaultPeriodLength).toString()) }
+        val pArr = JSONArray()
+        d.periods.forEach { pArr.put(JSONObject().put("start", it.start.toString()).put("end", it.end?.toString() ?: "")) }
+        
+        val lArr = JSONArray()
+        d.logs.forEach { l ->
+            val sArr = JSONArray()
+            l.symptoms.forEach { sArr.put(it) }
+            lArr.put(JSONObject().put("date", l.date.toString()).put("flow", l.flow).put("mood", l.mood).put("symptoms", sArr).put("note", l.note))
+        }
+
+        val root = JSONObject()
+            .put("periods", pArr)
+            .put("logs", lArr)
+            .put("defaultCycleLength", d.defaultCycleLength)
+            .put("defaultPeriodLength", d.defaultPeriodLength)
+
+        runCatching { file.writeText(root.toString()) }
         _data.value = d
+    }
+
+    fun saveLog(log: DailyLog) {
+        val currentLogs = _data.value.logs.filterNot { it.date == log.date }
+        save(_data.value.copy(logs = currentLogs + log))
+    }
+
+    fun getLog(date: LocalDate): DailyLog {
+        return _data.value.logs.find { it.date == date } ?: DailyLog(date)
     }
 
     fun startPeriod(date: LocalDate) {
@@ -165,6 +217,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot(store: Store) {
     val data by store.data
@@ -175,18 +228,9 @@ fun AppRoot(store: Store) {
         bottomBar = {
             if (onboarded) {
                 NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                    NavigationBarItem(
-                        selected = tab == 0, onClick = { tab = 0 },
-                        icon = { Text("◉", fontSize = 20.sp) }, label = { Text("Home", fontWeight = FontWeight.Medium) }
-                    )
-                    NavigationBarItem(
-                        selected = tab == 1, onClick = { tab = 1 },
-                        icon = { Text("▤", fontSize = 20.sp) }, label = { Text("Calendar", fontWeight = FontWeight.Medium) }
-                    )
-                    NavigationBarItem(
-                        selected = tab == 2, onClick = { tab = 2 },
-                        icon = { Text("⚙", fontSize = 20.sp) }, label = { Text("Settings", fontWeight = FontWeight.Medium) }
-                    )
+                    NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("◉", fontSize = 20.sp) }, label = { Text("Home") })
+                    NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("▤", fontSize = 20.sp) }, label = { Text("Calendar") })
+                    NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Text("⚙", fontSize = 20.sp) }, label = { Text("Settings") })
                 }
             }
         }
@@ -211,7 +255,6 @@ fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
     Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center) {
         Text("Welcome", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = RosePrimary)
         Text("Let's personalize your tracker.", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
-        
         Spacer(Modifier.height(40.dp))
         
         Text("Last period started", fontWeight = FontWeight.SemiBold)
@@ -220,24 +263,16 @@ fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
             Text(start.format(DateTimeFormatter.ofPattern("d MMM yyyy")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             OutlinedButton(onClick = { if (!start.plusDays(1).isAfter(LocalDate.now())) start = start.plusDays(1) }, shape = CircleShape) { Text("+", fontSize = 20.sp) }
         }
-        
         Spacer(Modifier.height(24.dp))
         
         Text("Cycle length: ${cycle.toInt()} days", fontWeight = FontWeight.SemiBold)
         Slider(value = cycle, onValueChange = { cycle = it }, valueRange = 21f..40f, steps = 18, colors = SliderDefaults.colors(thumbColor = RosePrimary, activeTrackColor = RosePrimary))
-        
         Spacer(Modifier.height(16.dp))
-        
         Text("Period length: ${period.toInt()} days", fontWeight = FontWeight.SemiBold)
         Slider(value = period, onValueChange = { period = it }, valueRange = 2f..10f, steps = 7, colors = SliderDefaults.colors(thumbColor = RosePrimary, activeTrackColor = RosePrimary))
         
         Spacer(Modifier.height(40.dp))
-        
-        Button(
-            onClick = { onDone(start, cycle.toInt(), period.toInt()) }, 
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) { 
+        Button(onClick = { onDone(start, cycle.toInt(), period.toInt()) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { 
             Text("Start Tracking", fontSize = 18.sp, fontWeight = FontWeight.Bold) 
         }
     }
@@ -246,91 +281,85 @@ fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
 @Composable
 fun HomeScreen(data: AppData, store: Store) {
     val info = Predictor.todayInfo(data)
+    val todayLog = store.getLog(LocalDate.now())
+    val stats = Predictor.stats(data)
+    
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        
         Text("Overview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
 
         if (info != null) {
             val (day, phase, dates) = info
             val (next, ov) = dates
-            val cycleLength = Predictor.stats(data).first
             
-            // Center Circular Ring
-            Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    progress = { day.toFloat() / cycleLength.toFloat() },
-                    modifier = Modifier.size(220.dp),
+                    progress = { day.toFloat() / stats.first.toFloat() },
+                    modifier = Modifier.size(200.dp),
                     color = RosePrimary,
                     trackColor = RoseLight,
                     strokeWidth = 16.dp
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Day", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
-                    Text("$day", fontSize = 64.sp, fontWeight = FontWeight.ExtraBold, color = RosePrimary)
+                    Text("$day", fontSize = 56.sp, fontWeight = FontWeight.ExtraBold, color = RosePrimary)
                 }
             }
             
             Spacer(Modifier.height(16.dp))
             
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SoftGrey),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.padding(24.dp)) {
-                    Text("Current Phase", style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-                    Text(
-                        phase.name.lowercase().replaceFirstChar { it.uppercase() }, 
-                        style = MaterialTheme.typography.titleLarge, 
-                        fontWeight = FontWeight.Bold,
-                        color = Charcoal
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Divider(color = Color.LightGray, thickness = 1.dp)
-                    Spacer(Modifier.height(16.dp))
-                    
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            Text("Next Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                            Text(next.format(DateTimeFormatter.ofPattern("d MMM")), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("Ovulation", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                            Text("~${ov.format(DateTimeFormatter.ofPattern("d MMM"))}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
+            // Insights Card
+            Card(colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Avg Cycle", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("${stats.first} days", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                    Column {
+                        Text("Avg Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("${stats.second} days", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Next Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text(next.format(DateTimeFormatter.ofPattern("d MMM")), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = RosePrimary)
                     }
                 }
             }
+
+            if (todayLog.flow.isNotEmpty() || todayLog.mood.isNotEmpty() || todayLog.symptoms.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Card(colors = CardDefaults.cardColors(containerColor = SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Today's Log", fontWeight = FontWeight.Bold, color = Charcoal)
+                        Spacer(Modifier.height(4.dp))
+                        if (todayLog.flow.isNotEmpty()) Text("Flow: ${todayLog.flow}", fontSize = 14.sp)
+                        if (todayLog.mood.isNotEmpty()) Text("Mood: ${todayLog.mood}", fontSize = 14.sp)
+                        if (todayLog.symptoms.isNotEmpty()) Text("Symptoms: ${todayLog.symptoms.joinToString(", ")}", fontSize = 14.sp)
+                    }
+                }
+            }
+
         } else {
-            Text("No data yet. Log your first period below to see predictions.", color = Color.Gray)
+            Text("No data yet. Log your first period in the Calendar tab.", color = Color.Gray)
         }
         
-        Spacer(Modifier.weight(1f))
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(32.dp))
         
-        Button(
-            onClick = { store.startPeriod(LocalDate.now()) }, 
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) { Text("Log Period Started Today", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-        
+        Button(onClick = { store.startPeriod(LocalDate.now()) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { 
+            Text("Log Period Started Today", fontSize = 16.sp, fontWeight = FontWeight.Bold) 
+        }
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(
-            onClick = { store.endPeriod(LocalDate.now()) }, 
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(2.dp, RosePrimary)
-        ) { Text("Log Period Ended Today", color = RosePrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-        
-        Spacer(Modifier.height(24.dp))
+        OutlinedButton(onClick = { store.endPeriod(LocalDate.now()) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(2.dp, RosePrimary)) { 
+            Text("Log Period Ended Today", color = RosePrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) 
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CalendarScreen(data: AppData, store: Store) {
     var month by remember { mutableStateOf(YearMonth.now()) }
-    var selected by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     val marks = remember(data) { Predictor.getCalendarMarks(data) }
     val today = LocalDate.now()
     
@@ -340,15 +369,12 @@ fun CalendarScreen(data: AppData, store: Store) {
             Text(month.month.name.lowercase().replaceFirstChar { it.uppercase() } + " ${month.year}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             IconButton(onClick = { month = month.plusMonths(1) }) { Text("›", fontSize = 28.sp, color = RosePrimary) }
         }
-        
         Spacer(Modifier.height(16.dp))
-        
         Row(Modifier.fillMaxWidth()) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach { 
                 Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, color = Color.Gray) 
             }
         }
-        
         Spacer(Modifier.height(8.dp))
 
         val offset = (month.atDay(1).dayOfWeek.value + 6) % 7
@@ -363,6 +389,7 @@ fun CalendarScreen(data: AppData, store: Store) {
                             val date = month.atDay(dayNum)
                             val mark = marks[date]
                             val isToday = date == today
+                            val hasLog = data.logs.any { it.date == date }
                             
                             val bgColor = when (mark) {
                                 "logged" -> RosePrimary
@@ -373,28 +400,21 @@ fun CalendarScreen(data: AppData, store: Store) {
                             val textColor = if (mark == "logged") Color.White else Charcoal
                             
                             Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(bgColor)
-                                    .then(
-                                        if (isToday) Modifier.border(2.dp, RosePrimary, CircleShape) else Modifier
-                                    )
-                                    .clickable { selected = date }, 
+                                Modifier.fillMaxSize().clip(CircleShape).background(bgColor)
+                                    .then(if (isToday) Modifier.border(2.dp, RosePrimary, CircleShape) else Modifier)
+                                    .clickable { selectedDate = date }, 
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    dayNum.toString(), 
-                                    color = textColor, 
-                                    fontWeight = if (mark != null || isToday) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Text(dayNum.toString(), color = textColor, fontWeight = if (mark != null || isToday) FontWeight.Bold else FontWeight.Normal)
+                                if (hasLog) {
+                                    Box(Modifier.size(4.dp).clip(CircleShape).background(if (mark == "logged") Color.White else RosePrimary).align(Alignment.BottomCenter).offset(y = (-4).dp))
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        
         Spacer(Modifier.height(32.dp))
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -405,22 +425,91 @@ fun CalendarScreen(data: AppData, store: Store) {
         }
     }
     
-    selected?.let { date ->
-        val isLogged = data.periods.any { it.start == date }
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            shape = RoundedCornerShape(24.dp),
-            title = { Text(date.format(DateTimeFormatter.ofPattern("d MMMM yyyy")), fontWeight = FontWeight.Bold) },
-            text = { Text(if (isLogged) "This day is logged as a period start." else "What would you like to do?") },
-            confirmButton = { 
-                if (isLogged) {
-                    TextButton(onClick = { store.deletePeriod(date); selected = null }) { Text("Delete", color = Color.Red, fontWeight = FontWeight.Bold) }
-                } else {
-                    TextButton(onClick = { store.startPeriod(date); selected = null }) { Text("Start Period", color = RosePrimary, fontWeight = FontWeight.Bold) } 
-                }
-            },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("Cancel", color = Color.Gray) } }
+    if (selectedDate != null) {
+        LogDayBottomSheet(
+            date = selectedDate!!,
+            initialLog = store.getLog(selectedDate!!),
+            isPeriodStart = data.periods.any { it.start == selectedDate },
+            onDismiss = { selectedDate = null },
+            onSave = { log -> store.saveLog(log); selectedDate = null },
+            onDeletePeriod = { store.deletePeriod(selectedDate!!); selectedDate = null }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun LogDayBottomSheet(
+    date: LocalDate,
+    initialLog: DailyLog,
+    isPeriodStart: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (DailyLog) -> Unit,
+    onDeletePeriod: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var flow by remember { mutableStateOf(initialLog.flow) }
+    var mood by remember { mutableStateOf(initialLog.mood) }
+    var note by remember { mutableStateOf(initialLog.note) }
+    val symptoms = remember { mutableStateListOf<String>().apply { addAll(initialLog.symptoms) } }
+    
+    val flowOptions = listOf("Spotting", "Light", "Medium", "Heavy")
+    val moodOptions = listOf("Happy", "Calm", "Anxious", "Irritable", "Sad")
+    val symptomOptions = listOf("Cramps", "Headache", "Bloating", "Acne", "Backache", "Fatigue")
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.White) {
+        Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
+            Text(date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            
+            Text("Flow", fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                flowOptions.forEach { option ->
+                    FilterChip(selected = flow == option, onClick = { flow = if (flow == option) "" else option }, label = { Text(option) })
+                }
+            }
+            
+            Text("Mood", fontWeight = FontWeight.SemiBold)
+            FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                moodOptions.forEach { option ->
+                    FilterChip(selected = mood == option, onClick = { mood = if (mood == option) "" else option }, label = { Text(option) })
+                }
+            }
+            
+            Text("Symptoms", fontWeight = FontWeight.SemiBold)
+            FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                symptomOptions.forEach { option ->
+                    FilterChip(
+                        selected = symptoms.contains(option),
+                        onClick = { if (symptoms.contains(option)) symptoms.remove(option) else symptoms.add(option) },
+                        label = { Text(option) }
+                    )
+                }
+            }
+            
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Notes") },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp)
+            )
+            
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { onSave(DailyLog(date, flow, mood, symptoms.toList(), note)) },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Save Log") }
+            
+            if (isPeriodStart) {
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onDeletePeriod, modifier = Modifier.fillMaxWidth()) {
+                    Text("Remove Period Start for this Day", color = Color.Red)
+                }
+            }
+            Spacer(Modifier.height(32.dp))
+        }
     }
 }
 
@@ -439,20 +528,16 @@ fun SettingsScreen(data: AppData, store: Store) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
         
-        Card(
-            colors = CardDefaults.cardColors(containerColor = SoftGrey),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Card(colors = CardDefaults.cardColors(containerColor = SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                Text("Cycle Data", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Your Data", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("You have logged ${data.periods.size} periods.", color = Color.Gray)
+                Text("${data.periods.size} periods logged.", color = Color.Gray)
+                Text("${data.logs.size} daily logs recorded.", color = Color.Gray)
             }
         }
         
         Spacer(Modifier.height(32.dp))
-        
         Button(
             onClick = { store.clearAll() }, 
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE), contentColor = Color.Red), 

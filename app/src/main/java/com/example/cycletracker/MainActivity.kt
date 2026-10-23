@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
@@ -450,8 +451,15 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search symptoms, notes...") },
+            placeholder = { Text("Search flow, mood, notes...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Color.Gray)
+                    }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(50.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -568,15 +576,16 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
             }
 
             Spacer(Modifier.height(24.dp))
-            Text("Recent Activity", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(if (searchQuery.isBlank()) "Recent Activity" else "Search Results", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
             val filteredLogs = data.logs.filter {
                 searchQuery.isBlank() ||
                 it.note.contains(searchQuery, true) ||
-                it.symptoms.any { s -> s.contains(searchQuery, true) } ||
-                it.mood.contains(searchQuery, true)
-            }.sortedByDescending { it.date }.take(5)
+                it.flow.contains(searchQuery, true) ||
+                it.mood.contains(searchQuery, true) ||
+                it.symptoms.any { s -> s.contains(searchQuery, true) }
+            }.sortedByDescending { it.date }.take(10)
 
             if (filteredLogs.isNotEmpty()) {
                 filteredLogs.forEach { log ->

@@ -1,9 +1,11 @@
 package com.example.cycletracker
 
+import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,10 +34,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.core.view.WindowCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -228,6 +233,9 @@ val DarkTextPrimary = Color(0xFFE0E0E0)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
         val store = Store(applicationContext)
         setContent {
             val data by store.data
@@ -259,54 +267,70 @@ fun AppRoot(store: Store) {
     var tab by remember { mutableStateOf(0) }
     var onboarded by remember { mutableStateOf(data.periods.isNotEmpty()) }
 
-    Scaffold(
-        bottomBar = {
-            if (onboarded) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(0.dp))
-                ) {
-                    NavigationBarItem(
-                        selected = tab == 0, onClick = { tab = 0 }, 
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Home") }, 
-                        label = { Text("Home", fontWeight = FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = RosePrimary,
-                            selectedTextColor = RosePrimary,
-                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !data.isDarkMode
+            insetsController.isAppearanceLightNavigationBars = !data.isDarkMode
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                if (onboarded) {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(0.dp))
+                    ) {
+                        NavigationBarItem(
+                            selected = tab == 0, onClick = { tab = 0 }, 
+                            icon = { Icon(Icons.Default.Home, contentDescription = "Home") }, 
+                            label = { Text("Home", fontWeight = FontWeight.Medium) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = RosePrimary,
+                                selectedTextColor = RosePrimary,
+                                indicatorColor = RoseLight.copy(alpha = 0.5f)
+                            )
                         )
-                    )
-                    NavigationBarItem(
-                        selected = tab == 1, onClick = { tab = 1 }, 
-                        icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") }, 
-                        label = { Text("Calendar", fontWeight = FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = RosePrimary,
-                            selectedTextColor = RosePrimary,
-                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+                        NavigationBarItem(
+                            selected = tab == 1, onClick = { tab = 1 }, 
+                            icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") }, 
+                            label = { Text("Calendar", fontWeight = FontWeight.Medium) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = RosePrimary,
+                                selectedTextColor = RosePrimary,
+                                indicatorColor = RoseLight.copy(alpha = 0.5f)
+                            )
                         )
-                    )
-                    NavigationBarItem(
-                        selected = tab == 2, onClick = { tab = 2 }, 
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") }, 
-                        label = { Text("Settings", fontWeight = FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = RosePrimary,
-                            selectedTextColor = RosePrimary,
-                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+                        NavigationBarItem(
+                            selected = tab == 2, onClick = { tab = 2 }, 
+                            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") }, 
+                            label = { Text("Settings", fontWeight = FontWeight.Medium) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = RosePrimary,
+                                selectedTextColor = RosePrimary,
+                                indicatorColor = RoseLight.copy(alpha = 0.5f)
+                            )
                         )
-                    )
+                    }
                 }
             }
-        }
-    ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize().statusBarsPadding()) {
-            when {
-                !onboarded -> Onboarding { s, c, p -> store.setDefaults(c, p); store.startPeriod(s); onboarded = true }
-                tab == 0 -> HomeScreen(data, store)
-                tab == 1 -> CalendarScreen(data, store)
-                else -> SettingsScreen(data, store)
+        ) { pad ->
+            Box(Modifier.padding(pad).fillMaxSize().statusBarsPadding()) {
+                when {
+                    !onboarded -> Onboarding { s, c, p -> store.setDefaults(c, p); store.startPeriod(s); onboarded = true }
+                    tab == 0 -> HomeScreen(data, store)
+                    tab == 1 -> CalendarScreen(data, store)
+                    else -> SettingsScreen(data, store)
+                }
             }
         }
     }
@@ -351,10 +375,19 @@ fun HomeScreen(data: AppData, store: Store) {
     val stats = Predictor.stats(data)
     
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
-        // Cleaner Header
+        
+        // Dynamic Time Greeting
+        val currentHour = LocalTime.now().hour
+        val greeting = when {
+            currentHour < 12 -> "Good Morning,"
+            currentHour < 17 -> "Good Afternoon,"
+            currentHour < 21 -> "Good Evening,"
+            else -> "Good Night,"
+        }
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text("Good Morning,", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                Text(greeting, style = MaterialTheme.typography.titleMedium, color = Color.Gray)
                 Text("Your Cycle", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
             }
         }
@@ -365,7 +398,6 @@ fun HomeScreen(data: AppData, store: Store) {
             val (day, phase, dates) = info
             val (next, ov) = dates
             
-            // Elegant Ring
             Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { day.toFloat() / stats.first.toFloat() },
@@ -384,7 +416,6 @@ fun HomeScreen(data: AppData, store: Store) {
             
             Spacer(Modifier.height(24.dp))
             
-            // Elevated Insight Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), 
@@ -394,11 +425,11 @@ fun HomeScreen(data: AppData, store: Store) {
                 Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Avg Cycle", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Text("${stats.first} days", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("${stats.first} ${if (stats.first == 1) "day" else "days"}", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     }
                     Column {
                         Text("Avg Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Text("${stats.second} days", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("${stats.second} ${if (stats.second == 1) "day" else "days"}", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Next Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
@@ -407,7 +438,6 @@ fun HomeScreen(data: AppData, store: Store) {
                 }
             }
 
-            // Chart - Only show if enough data
             if (data.periods.size >= 2) {
                 Spacer(Modifier.height(16.dp))
                 Card(
@@ -481,7 +511,9 @@ fun HomeScreen(data: AppData, store: Store) {
         ) { 
             Text("Log Period Ended Today", color = RosePrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) 
         }
-        Spacer(Modifier.height(24.dp))
+        
+        // Spacer to ensure the buttons don't get hidden behind the bottom nav
+        Spacer(Modifier.height(80.dp))
     }
 }
 
@@ -597,7 +629,8 @@ fun LogDayBottomSheet(
             Spacer(Modifier.height(20.dp))
             
             Text("Flow", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Changed from Row to FlowRow so "Heavy" wraps cleanly
+            FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 flowOptions.forEach { option ->
                     FilterChip(selected = flow == option, onClick = { flow = if (flow == option) "" else option }, label = { Text(option) })
                 }
@@ -718,5 +751,6 @@ fun SettingsScreen(data: AppData, store: Store) {
         ) { 
             Text("Delete All Data", fontWeight = FontWeight.Bold, fontSize = 16.sp) 
         }
+        Spacer(Modifier.height(24.dp))
     }
 }

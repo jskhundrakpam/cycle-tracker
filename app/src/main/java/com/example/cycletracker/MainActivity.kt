@@ -40,14 +40,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-// --- DATA & LOGIC (Unchanged) ---
+// --- DATA & LOGIC ---
 data class PeriodEntry(val start: LocalDate, val end: LocalDate? = null)
 data class DailyLog(
     val date: LocalDate,
@@ -254,7 +253,6 @@ fun AppRoot(store: Store) {
     Box(Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            // We add huge bottom padding so content scrolls above the floating nav
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { pad ->
             Box(Modifier.padding(pad).fillMaxSize().statusBarsPadding()) {
@@ -325,7 +323,6 @@ fun FloatingNavItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
 }
 
 @Composable
-@Composable
 fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
     var start by remember { mutableStateOf(LocalDate.now()) }
     var cycle by remember { mutableStateOf(28f) }
@@ -356,6 +353,8 @@ fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
         }
     }
 }
+
+@Composable
 fun HomeScreen(data: AppData, store: Store) {
     val info = Predictor.todayInfo(data)
     val stats = Predictor.stats(data)
@@ -366,7 +365,7 @@ fun HomeScreen(data: AppData, store: Store) {
         // Big Modern Header
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Cycle Tracker", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = RosePrimary)
-            // Three dots menu icon (visual only for now)
+            // Three dots menu icon
             Text("⋮", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
         }
         

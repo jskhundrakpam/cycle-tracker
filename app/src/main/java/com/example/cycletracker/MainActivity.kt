@@ -159,8 +159,20 @@ fun Onboarding(onDone: (LocalDate, Int, Int) -> Unit) {
             OutlinedButton(onClick = { start = start.minusDays(1) }) { Text("−") }
             OutlinedButton(onClick = { if (!start.plusDays(1).isAfter(LocalDate.now())) start = start.plusDays(1) }) { Text("+") }
         }
-        Text("Cycle length: ${cycle.toInt()} days"); Slider(cycle, { cycle = it }, 21f..40f, 18)
-        Text("Period length: ${period.toInt()} days"); Slider(period, { period = it }, 2f..10f, 7)
+        Text("Cycle length: ${cycle.toInt()} days")
+Slider(
+    value = cycle,
+    onValueChange = { cycle = it },
+    valueRange = 21f..40f,
+    steps = 18
+)
+Text("Period length: ${period.toInt()} days")
+Slider(
+    value = period,
+    onValueChange = { period = it },
+    valueRange = 2f..10f,
+    steps = 7
+)
         Spacer(Modifier.height(24.dp))
         Button(onClick = { onDone(start, cycle.toInt(), period.toInt()) }, modifier = Modifier.fillMaxWidth()) { Text("Start Tracking") }
     }

@@ -299,19 +299,20 @@ fun AppRoot(store: Store) {
         }
 
         if (onboarded) {
+            // Wide, Slim Bottom Nav
             Box(
-                Modifier.fillMaxWidth().align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp),
+                Modifier.fillMaxWidth().align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp, start = 24.dp, end = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
                     shape = RoundedCornerShape(50.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 12.dp,
-                    modifier = Modifier.wrapContentSize()
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp), 
-                        horizontalArrangement = Arrangement.spacedBy(12.dp), 
+                        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), 
+                        horizontalArrangement = Arrangement.SpaceEvenly, 
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         FloatingNavItem("Home", Icons.Default.Home, tab == 0) { tab = 0 }
@@ -321,15 +322,19 @@ fun AppRoot(store: Store) {
                 }
             }
 
+            // FAB moved UP and sized properly
             if (tab == 0) {
                 FloatingActionButton(
                     onClick = { showLogConfirmation = true },
                     containerColor = RosePrimary,
                     contentColor = Color.White,
                     shape = CircleShape,
-                    modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(bottom = 90.dp, end = 24.dp)
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(bottom = 110.dp, end = 24.dp) // Moved up significantly
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Log Period", modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.Add, contentDescription = "Log Period", modifier = Modifier.size(28.dp))
                 }
             }
         }
@@ -403,22 +408,22 @@ fun FloatingNavItem(label: String, icon: androidx.compose.ui.graphics.vector.Ima
     val bgColor = if (isSelected) RoseLight.copy(alpha = if (MaterialTheme.colorScheme.background == DarkBackground) 0.2f else 1f) else Color.Transparent
     val contentColor = if (isSelected) RosePrimary else Color.Gray
 
-    // Always use a Column (Icon on top, Text on bottom)
+    // Slimmer vertical column
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(50.dp))
             .background(bgColor)
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp), // Reduced vertical padding
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.height(4.dp))
+        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp)) // Slightly smaller icon
+        Spacer(Modifier.height(2.dp)) // Tighter spacing
         Text(
             label, 
             color = contentColor, 
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
-            fontSize = 12.sp
+            fontSize = 11.sp // Smaller text
         )
     }
 }
@@ -586,7 +591,7 @@ fun HomeScreen(data: AppData, store: Store, onEditLog: (LocalDate) -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(120.dp))
+        Spacer(Modifier.height(120.dp)) // Space for FAB and Nav
     }
 }
 

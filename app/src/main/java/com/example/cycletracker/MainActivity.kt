@@ -12,12 +12,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -213,6 +218,7 @@ val RoseLight = Color(0xFFFCE4EC)
 val Charcoal = Color(0xFF2C2C2C)
 val SoftGrey = Color(0xFFF5F5F5)
 val GreenLight = Color(0xFFE8F5E9)
+val CleanWhite = Color(0xFFFAFAFA)
 
 val DarkBackground = Color(0xFF121212)
 val DarkSurface = Color(0xFF1E1E1E)
@@ -229,19 +235,13 @@ class MainActivity : ComponentActivity() {
             
             val colorScheme = if (isDark) {
                 darkColorScheme(
-                    primary = RosePrimary,
-                    onPrimary = Color.White,
-                    background = DarkBackground,
-                    surface = DarkSurface,
-                    onSurface = DarkTextPrimary
+                    primary = RosePrimary, onPrimary = Color.White,
+                    background = DarkBackground, surface = DarkSurface, onSurface = DarkTextPrimary
                 )
             } else {
                 lightColorScheme(
-                    primary = RosePrimary,
-                    onPrimary = Color.White,
-                    background = Color(0xFFFDFBFB),
-                    surface = Color.White,
-                    onSurface = Charcoal
+                    primary = RosePrimary, onPrimary = Color.White,
+                    background = CleanWhite, surface = Color.White, onSurface = Charcoal
                 )
             }
 
@@ -262,15 +262,46 @@ fun AppRoot(store: Store) {
     Scaffold(
         bottomBar = {
             if (onboarded) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
-                    NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("◉", fontSize = 20.sp) }, label = { Text("Home") })
-                    NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("▤", fontSize = 20.sp) }, label = { Text("Calendar") })
-                    NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Text("⚙", fontSize = 20.sp) }, label = { Text("Settings") })
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), shape = RoundedCornerShape(0.dp))
+                ) {
+                    NavigationBarItem(
+                        selected = tab == 0, onClick = { tab = 0 }, 
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Home") }, 
+                        label = { Text("Home", fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = RosePrimary,
+                            selectedTextColor = RosePrimary,
+                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = tab == 1, onClick = { tab = 1 }, 
+                        icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") }, 
+                        label = { Text("Calendar", fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = RosePrimary,
+                            selectedTextColor = RosePrimary,
+                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = tab == 2, onClick = { tab = 2 }, 
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") }, 
+                        label = { Text("Settings", fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = RosePrimary,
+                            selectedTextColor = RosePrimary,
+                            indicatorColor = RoseLight.copy(alpha = 0.5f)
+                        )
+                    )
                 }
             }
         }
     ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) {
+        Box(Modifier.padding(pad).fillMaxSize().statusBarsPadding()) {
             when {
                 !onboarded -> Onboarding { s, c, p -> store.setDefaults(c, p); store.startPeriod(s); onboarded = true }
                 tab == 0 -> HomeScreen(data, store)
@@ -319,84 +350,115 @@ fun HomeScreen(data: AppData, store: Store) {
     val todayLog = store.getLog(LocalDate.now())
     val stats = Predictor.stats(data)
     
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        Text("Overview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
+        // Cleaner Header
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text("Good Morning,", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                Text("Your Cycle", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        
+        Spacer(Modifier.height(32.dp))
 
         if (info != null) {
             val (day, phase, dates) = info
             val (next, ov) = dates
             
-            Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+            // Elegant Ring
+            Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { day.toFloat() / stats.first.toFloat() },
-                    modifier = Modifier.size(200.dp),
+                    modifier = Modifier.size(220.dp),
                     color = RosePrimary,
-                    trackColor = if (data.isDarkMode) DarkSurfaceVariant else RoseLight,
-                    strokeWidth = 16.dp
+                    trackColor = if (data.isDarkMode) DarkSurfaceVariant else Color(0xFFF0F0F0),
+                    strokeWidth = 12.dp,
+                    strokeCap = StrokeCap.Round
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Day", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
-                    Text("$day", fontSize = 56.sp, fontWeight = FontWeight.ExtraBold, color = RosePrimary)
+                    Text("DAY", style = MaterialTheme.typography.labelLarge, color = Color.Gray, letterSpacing = 2.sp)
+                    Text("$day", fontSize = 72.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+                    Text(phase.name.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = RosePrimary)
                 }
             }
             
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
             
-            // Insights Card
+            // Elevated Insight Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
-                elevation = CardDefaults.cardElevation(2.dp), 
-                shape = RoundedCornerShape(16.dp), 
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), 
+                shape = RoundedCornerShape(24.dp), 
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Avg Cycle", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Text("${stats.first} days", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("${stats.first} days", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     }
                     Column {
                         Text("Avg Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Text("${stats.second} days", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("${stats.second} days", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Next Period", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                        Text(next.format(DateTimeFormatter.ofPattern("d MMM")), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = RosePrimary)
+                        Text(next.format(DateTimeFormatter.ofPattern("d MMM")), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = RosePrimary)
                     }
                 }
             }
 
-            // History Chart
+            // Chart - Only show if enough data
             if (data.periods.size >= 2) {
                 Spacer(Modifier.height(16.dp))
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text("Recent Cycle Lengths", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Spacer(Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), 
+                    shape = RoundedCornerShape(24.dp), 
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(24.dp)) {
+                        Text("Cycle History", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(20.dp))
+                        
                         val sortedPeriods = data.periods.sortedBy { it.start }
                         val intervals = sortedPeriods.zipWithNext { a, b -> ChronoUnit.DAYS.between(a.start, b.start).toInt() }.takeLast(6)
+                        
                         Row(Modifier.fillMaxWidth().height(100.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                             intervals.forEach { len ->
                                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(Modifier.width(20.dp).height((len * 2).dp).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(RosePrimary))
-                                    Spacer(Modifier.height(4.dp))
-                                    Text("$len", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                    Box(Modifier.width(24.dp).height((len * 2.2).dp).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(RosePrimary.copy(alpha = 0.8f)))
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("$len", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
+                    }
+                }
+            } else {
+                Spacer(Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), 
+                    shape = RoundedCornerShape(24.dp), 
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Cycle History", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Log at least 2 periods to see your history chart.", color = Color.Gray, fontSize = 14.sp, textAlign = TextAlign.Center)
                     }
                 }
             }
 
             if (todayLog.flow.isNotEmpty() || todayLog.mood.isNotEmpty() || todayLog.symptoms.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
-                Card(colors = CardDefaults.cardColors(containerColor = if (data.isDarkMode) DarkSurfaceVariant else SoftGrey), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Today's Log", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        if (todayLog.flow.isNotEmpty()) Text("Flow: ${todayLog.flow}", fontSize = 14.sp)
-                        if (todayLog.mood.isNotEmpty()) Text("Mood: ${todayLog.mood}", fontSize = 14.sp)
-                        if (todayLog.symptoms.isNotEmpty()) Text("Symptoms: ${todayLog.symptoms.joinToString(", ")}", fontSize = 14.sp)
+                Card(colors = CardDefaults.cardColors(containerColor = if (data.isDarkMode) DarkSurfaceVariant else SoftGrey), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text("Today's Log", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(Modifier.height(6.dp))
+                        if (todayLog.flow.isNotEmpty()) Text("Flow: ${todayLog.flow}", fontSize = 14.sp, color = Color.Gray)
+                        if (todayLog.mood.isNotEmpty()) Text("Mood: ${todayLog.mood}", fontSize = 14.sp, color = Color.Gray)
+                        if (todayLog.symptoms.isNotEmpty()) Text("Symptoms: ${todayLog.symptoms.joinToString(", ")}", fontSize = 14.sp, color = Color.Gray)
                     }
                 }
             }
@@ -411,9 +473,15 @@ fun HomeScreen(data: AppData, store: Store) {
             Text("Log Period Started Today", fontSize = 16.sp, fontWeight = FontWeight.Bold) 
         }
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { store.endPeriod(LocalDate.now()) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(2.dp, RosePrimary)) { 
+        OutlinedButton(
+            onClick = { store.endPeriod(LocalDate.now()) }, 
+            modifier = Modifier.fillMaxWidth().height(56.dp), 
+            shape = RoundedCornerShape(16.dp), 
+            border = androidx.compose.foundation.BorderStroke(2.dp, RosePrimary.copy(alpha = 0.5f))
+        ) { 
             Text("Log Period Ended Today", color = RosePrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold) 
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -425,19 +493,19 @@ fun CalendarScreen(data: AppData, store: Store) {
     val marks = remember(data) { Predictor.getCalendarMarks(data) }
     val today = LocalDate.now()
     
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { month = month.minusMonths(1) }) { Text("‹", fontSize = 28.sp, color = RosePrimary) }
+            IconButton(onClick = { month = month.minusMonths(1) }, colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface)) { Text("‹", fontSize = 28.sp, color = RosePrimary, fontWeight = FontWeight.Bold) }
             Text(month.month.name.lowercase().replaceFirstChar { it.uppercase() } + " ${month.year}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { month = month.plusMonths(1) }) { Text("›", fontSize = 28.sp, color = RosePrimary) }
+            IconButton(onClick = { month = month.plusMonths(1) }, colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surface)) { Text("›", fontSize = 28.sp, color = RosePrimary, fontWeight = FontWeight.Bold) }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth()) {
             listOf("M", "T", "W", "T", "F", "S", "S").forEach { 
-                Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, color = Color.Gray) 
+                Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp) 
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
         val offset = (month.atDay(1).dayOfWeek.value + 6) % 7
         val days = month.lengthOfMonth()
@@ -478,8 +546,12 @@ fun CalendarScreen(data: AppData, store: Store) {
             }
         }
         Spacer(Modifier.height(32.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(2.dp)) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 LegendItem(RosePrimary, "Period")
                 LegendItem(if (data.isDarkMode) Color(0xFF4A2530) else RoseLight, "Predicted")
                 LegendItem(if (data.isDarkMode) Color(0xFF1B3824) else GreenLight, "Fertile")
@@ -522,23 +594,25 @@ fun LogDayBottomSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
             Text(date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
             
-            Text("Flow", fontWeight = FontWeight.SemiBold)
+            Text("Flow", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 flowOptions.forEach { option ->
                     FilterChip(selected = flow == option, onClick = { flow = if (flow == option) "" else option }, label = { Text(option) })
                 }
             }
             
-            Text("Mood", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text("Mood", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 moodOptions.forEach { option ->
                     FilterChip(selected = mood == option, onClick = { mood = if (mood == option) "" else option }, label = { Text(option) })
                 }
             }
             
-            Text("Symptoms", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text("Symptoms", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 symptomOptions.forEach { option ->
                     FilterChip(
@@ -549,20 +623,21 @@ fun LogDayBottomSheet(
                 }
             }
             
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("Notes") },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
             
             Spacer(Modifier.height(24.dp))
-            Button(onClick = { onSave(DailyLog(date, flow, mood, symptoms.toList(), note)) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)) { Text("Save Log") }
+            Button(onClick = { onSave(DailyLog(date, flow, mood, symptoms.toList(), note)) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp)) { Text("Save Log", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             
             if (isPeriodStart) {
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDeletePeriod, modifier = Modifier.fillMaxWidth()) { Text("Remove Period Start for this Day", color = Color.Red) }
+                TextButton(onClick = onDeletePeriod, modifier = Modifier.fillMaxWidth()) { Text("Remove Period Start for this Day", color = Color.Red, fontWeight = FontWeight.SemiBold) }
             }
             Spacer(Modifier.height(32.dp))
         }
@@ -572,9 +647,9 @@ fun LogDayBottomSheet(
 @Composable
 fun LegendItem(color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(14.dp).clip(CircleShape).background(color))
+        Box(Modifier.size(12.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Text(text, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = Color.Gray)
     }
 }
 
@@ -585,27 +660,37 @@ fun SettingsScreen(data: AppData, store: Store) {
     var showCopiedText by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(24.dp))
         
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = RoundedCornerShape(24.dp), 
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("Dark Mode", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("Easier on the eyes at night", color = Color.Gray, fontSize = 14.sp)
                 }
-                Switch(checked = data.isDarkMode, onCheckedChange = { store.toggleTheme() })
+                Switch(checked = data.isDarkMode, onCheckedChange = { store.toggleTheme() }, colors = SwitchDefaults.colors(checkedTrackColor = RosePrimary))
             }
         }
 
         Spacer(Modifier.height(16.dp))
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp)) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), 
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = RoundedCornerShape(24.dp), 
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(24.dp)) {
                 Text("Your Data", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("${data.periods.size} periods logged.", color = Color.Gray)
-                Text("${data.logs.size} daily logs recorded.", color = Color.Gray)
+                Text("${data.periods.size} periods logged.", color = Color.Gray, fontSize = 14.sp)
+                Text("${data.logs.size} daily logs recorded.", color = Color.Gray, fontSize = 14.sp)
             }
         }
         
